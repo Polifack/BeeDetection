@@ -25,9 +25,9 @@ println(lab)
 function fourier(ampSignal, frameTime, sampFreq) 
     freqSignal = abs.(fft(ampSignal))
     chanLength = length(ampSignal)
-    nFrames = frameTime * sampFreq
+    nFrames = trunc(Int,frameTime * sampFreq)
     #Comprobacion de valores
-    if (iseven(nsamples))
+    if (iseven(nFrames))
         @assert(mean(abs.(freqSignal[2:Int(nFrames/2)] .- freqSignal[end:-1:(Int(nFrames/2)+2)]))<1e-8)
         freqSignal = freqSignal[1:(Int(nFrames/2)+1)]
     else
@@ -80,7 +80,7 @@ end
 #Output:
 #   devuelve un array de elementos compuestos por
 #       [1] -> trim de doubles que representan el sonido en amplitud, es un trim del audioChannel
-#       [2] -> bool que indica si en dicho segmento hay abeja o no 
+#       [2] -> 1.0 o 0.0 que indica si en dicho segmento hay abeja o no 
 function splitAudioWithLabfile(labData, audioChannel, sampleFrequency)
     sound = []
 
@@ -121,6 +121,55 @@ function splitAudioWithLabfile(labData, audioChannel, sampleFrequency)
     return sound
 end
 
+
+#Inputs:
+#   windowLength -> tamaño de la ventana de audio que vamos a procesar de cada vez
+#   offsetLength -> tamaño del desplazamiento que vamos a procesar de cada vez
+#   audioChannel -> pista de audio que vamos a procesar
+#   sampleFrequency -> frecuencia de muestreo, necesaria para calcular nSamples
+#   hasBee -> indicador de si en el audio audioChannel hay abjea
+#Output
+#   devuelve un array de elementos compuestos por
+#       [1] -> media de la fft del audio en la ventana indicada
+#       [2] -> desv tipica de la fft del audio en la ventana indicada
+#       [3] -> 1.0 o 0.0 indicando si hay abeja en el audio o no
+function parseAudioSample(windowLength, offsetLength, audioChannel, sampleFrequency, hasBee)
+    windowSamples = trunc(Int, windowLength * sampleFrequency)
+    audioSamples = length(audioChannel)
+    
+    #parametros que nos sirven para ver donde empieza y acaba la ventana
+    begin_window = 0
+    end_window = (begin_window+windowSamples)
+
+    #array de los resultados de procesar el audio
+    result = []
+
+    #repetimos hasta que la ultima ventana no se pueda procesar entera, esto es, descartamos lo que sobra
+    while (end_window < audioSamples)
+        #Array temporal que contiene el audio de la ventana
+        audioWindowAmp = []
+        #Obtenemos las samples de audio de la ventana
+        for x=(begin_window+1):(end_window)
+            push!(audioWindowAmp, audioChannel[x])
+        end
+        #Movemos las ventanas
+        begin_window+=trunc(Int, (offsetLength*sampleFrequency))
+        end_window+=trunc(Int, (offsetLength*sampleFrequency))
+
+        #Convertimos el array a Floats
+        audioWindowAmp = convert(Array{Float64,1}, audioWindowAmp)
+        audioWindowFreq = fourier(audioWindowAmp, windowLength, sampleFrequency)
+
+        media = mean(audioWindowFreq[1:length(audioWindowFreq)])
+        desviacion = std(audioWindowFreq[1:length(audioWindowFreq)]);
+
+        #Elemento que contiene la media, desviacion y si hay abeja o no
+        element = [media, desviacion, hasBee]
+        push!(result, element)
+    end
+    return result
+end
+
 ###############
 #PROCESAR AUDIO
 ###############
@@ -139,16 +188,24 @@ end
 #################
 #PROCESAR DATOS
 #################
-    
     #Separamos el audio segun haya abeja o no
     sound  = splitAudioWithLabfile(labdata, audio_channel, freq)
-    
-    #Printeamos el array de sonidos
-    for x=1:length(sound)
-        print(sound[x])
+
+    #Obtenemos los parametros
+    windowSize = 3
+    windowOffset = 1
+
+    #Parseamos todos los audios
+    for x=(1:length(sound))
+        audio = sound[x][1]
+        has_bee = sound[x][2]
+
+        parsed_audio = parseAudioSample(windowSize, windowOffset, audio, freq, has_bee)
+        println("*****************")
+        println(parsed_audio)
+        println("*****************")
     end
 
-    #Parseamos cada uno de los segmentos segun un tiempo n
 
     
 
