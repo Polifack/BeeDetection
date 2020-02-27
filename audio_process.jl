@@ -220,7 +220,10 @@ function process_sample(audioPath, labPath, fileName, windowSize, windowOffset)
         print(f, round.(parsedAudio[i][1]; digits=3)," ")
         print(f, round.(parsedAudio[i][1]; digits=3)," ")
         
-        has_bee = (parsedAudio[i][3]==1.0)
+        has_bee = "no_bee"
+        if (parsedAudio[i][3]==1.0) 
+            has_bee = "bee"
+        end
         println(f, has_bee)
     end
     close(f)
@@ -235,5 +238,5 @@ lab = args[2]
 fileName = "audio.txt"
 #Borramos el archivo si existe
 rm(fileName)
-process_sample(cancion, lab,"audio.txt",3, 1)
+process_sample(cancion, lab, "audio.txt",3, 1)
 
