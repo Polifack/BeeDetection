@@ -215,7 +215,7 @@ function process_sample(audioPath, labPath, fileName, windowSize, windowOffset)
     
     println("[*] Escribiendo resultados en ", fileName)
     #Escribimos en el archivo los datos procesados
-    f = open(fileName, "w")
+    f = open(fileName, "a")
     for i in eachindex(parsedAudio)
         print(f, round.(parsedAudio[i][1]; digits=3)," ")
         print(f, round.(parsedAudio[i][1]; digits=3)," ")
@@ -223,6 +223,7 @@ function process_sample(audioPath, labPath, fileName, windowSize, windowOffset)
         has_bee = (parsedAudio[i][3]==1.0)
         println(f, has_bee)
     end
+    close(f)
     println("[*] Procesado completado")
 end
 
@@ -231,5 +232,8 @@ end
 args = ARGS
 cancion = args[1]
 lab = args[2]
+fileName = "audio.txt"
+#Borramos el archivo si existe
+rm(fileName)
 process_sample(cancion, lab,"audio.txt",3, 1)
 
