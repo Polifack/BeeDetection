@@ -4,18 +4,6 @@ using Statistics
 using PlotlyJS
 using DelimitedFiles
 
-
-args = ARGS
-
-#Usage julia ./procesado.jl 'song.wav' 'data.lab'
-
-cancion = args[1]
-lab = args[2]
-
-println(cancion)
-println(lab)
-
-
 #Inputs:
 #   ampSignal -> Señal en amplitud
 #   frameTime -> Duracion en segundos del marco de la señal
@@ -47,6 +35,7 @@ end
 #       [2] -> tiempo fin
 #       [3] -> 'bee' o 'nobee'
 function processLabfile(fileName)
+    println("[*] Procesando el archivo lab: ",fileName)
     samplesFile = readdlm(fileName, header=true)
 
     #Procesamos los valores de los archivos
@@ -58,15 +47,12 @@ function processLabfile(fileName)
     endTimes = sampleDataRaw[1:end-1,2];
     hasBee = sampleDataRaw[1:end-1,3];  
 
-    createArray(startTimes, endTimes, hasBee)
-end
-function createArray(startTimes, endTimes, classes)
     temp = []
-    for x = 1:length(classes)
-        element = [startTimes[x], endTimes[x], classes[x]]
+    for x = 1:length(hasBee)
+        element = [startTimes[x], endTimes[x], hasBee[x]]
         push!(temp, element)
     end
-
+    println("[*] Procesado del archivo lab completado")
     return temp
 end
 
@@ -82,19 +68,20 @@ end
 #       [1] -> trim de doubles que representan el sonido en amplitud, es un trim del audioChannel
 #       [2] -> 1.0 o 0.0 que indica si en dicho segmento hay abeja o no 
 function splitAudioWithLabfile(labData, audioChannel, sampleFrequency)
+    println("[*] Separando el archivo de audio con el archivo lab")
     sound = []
 
     #Calculamos el numero de muestras del audio y su duracion en segundos
     nsamples = length(audioChannel)/sampleFrequency
     duracion = nsamples / sampleFrequency
     
-    for x=1:length(labdata)
+    for x=1:length(labData)
         #Formalizamos los datos del array
-        start_time = labdata[x][1]
-        end_time = labdata[x][2]
+        start_time = labData[x][1]
+        end_time = labData[x][2]
         length = end_time - start_time
         has_bee = false
-        if (labdata[x][3]=="bee") 
+        if (labData[x][3]=="bee") 
             has_bee = true
         end
 
@@ -108,7 +95,7 @@ function splitAudioWithLabfile(labData, audioChannel, sampleFrequency)
         #Pillamos los samples del audio en las frecuencias deseadas
         audio_trim = []
         for i=sample_start:sample_end
-            push!(audio_trim, audio_channel[i])
+            push!(audio_trim, audioChannel[i])
         end
 
         #Creamos un par del tramo de audio deseado y el bool que indica si hay abeja o no
@@ -117,10 +104,9 @@ function splitAudioWithLabfile(labData, audioChannel, sampleFrequency)
         #Añadimos el elemento al array general 
         push!(sound, element)
     end
-
+    println("[*] Separacion del archivo de audio completada")
     return sound
 end
-
 
 #Inputs:
 #   windowLength -> tamaño de la ventana de audio que vamos a procesar de cada vez
@@ -134,6 +120,7 @@ end
 #       [2] -> desv tipica de la fft del audio en la ventana indicada
 #       [3] -> 1.0 o 0.0 indicando si hay abeja en el audio o no
 function parseAudioSample(windowLength, offsetLength, audioChannel, sampleFrequency, hasBee)
+    println("[*] Procesando segmento de audio con tamaño de ventana = ", windowLength)
     windowSamples = trunc(Int, windowLength * sampleFrequency)
     audioSamples = length(audioChannel)
     
@@ -167,48 +154,82 @@ function parseAudioSample(windowLength, offsetLength, audioChannel, sampleFreque
         element = [media, desviacion, hasBee]
         push!(result, element)
     end
+    println("[*] Procesado del segmento de audio completado")
     return result
 end
 
-###############
-#PROCESAR AUDIO
-###############
+#Inputs:
+#   soundData -> array de los datos del archivo de audio procesado
+#       [1] -> array de segmentos con las frecuencias del audio
+#       [2] -> array de segmentos con un 1.0 o 0.0 que indica si existe abeja
+#   windowSize -> tamaño de la ventana que queremos procesar
+#   windowOffset -> tamaño del desplazamiento que vamos a procesar de cada vez
+#   frequency -> frecuencia de muestreo
+#Output
+#   devuelve un array de elementos de TODO el wav compuestos por
+#       [1] -> media de la fft del audio en la ventana indicada
+#       [2] -> desv tipica de la fft del audio en la ventana indicada
+#       [3] -> 1.0 o 0.0 indicando si hay abeja en el audio o no
+function process_wav(soundData, windowSize, windowOffset, frequency)
+    println("[*] Procesando archivo wav")
+    parsed_audio = []
+    for x=(1:length(soundData))
+        audio = soundData[x][1]
+        has_bee = soundData[x][2]
 
-    #Leemos el audio
-    sound, freq = wavread(cancion, format="double")
-    #separamos los canales
-    audio_channel = sound[:,1]
-
-#################
-#PROCESAR LABFILE
-#################
-    
-    labdata = processLabfile(lab)
-
-#################
-#PROCESAR DATOS
-#################
-    #Separamos el audio segun haya abeja o no
-    sound  = splitAudioWithLabfile(labdata, audio_channel, freq)
-
-    #Obtenemos los parametros
-    windowSize = 3
-    windowOffset = 1
-
-    #Parseamos todos los audios
-    for x=(1:length(sound))
-        audio = sound[x][1]
-        has_bee = sound[x][2]
-
-        parsed_audio = parseAudioSample(windowSize, windowOffset, audio, freq, has_bee)
-        println("*****************")
-        println(parsed_audio)
-        println("*****************")
+        parsed_frame = parseAudioSample(windowSize, windowOffset, audio, frequency, has_bee)
+        push!(parsed_audio, parsed_frame)
     end
 
+    result = []
+    for x=(1:length(parsed_audio))
+        subarray = parsed_audio[x]
+        for y=(1:length(subarray))
+            element = subarray[y]
+            push!(result, element)
+        end
+    end
+    return result
+    println("[*] Procesado del archivo wav completado")
+    return (parsed_audio)
+end
 
+
+#Inputs:
+#   audioPath -> path al archivo del audio de la muestra
+#   labPath -> path al archivo .lab relacionado con el audio
+#   fileName -> path al archivo.txt que vamos a escribir los resultados
+#   windowSize -> tamaño de la ventana que queremos procesar
+#   windowOffset -> tamaño del desplazamiento que vamos a procesar de cada vez
+function process_sample(audioPath, labPath, fileName, windowSize, windowOffset)
+    println("[*] Iniciando procesado de ",audioPath," con archivo de datos ",labPath)
+    #Leemos el labfile y el audio
+    labData = processLabfile(labPath)
+    sound, freq = wavread(audioPath, format="double")
+    #Separamos los canales
+    audioChannel = sound[:,1]
+    #Procesamos el sonido con la labfile
+    sound  = splitAudioWithLabfile(labData, audioChannel, freq)
+    #Parseamos el audio para obtener los parametros y la salida deseada
+    parsedAudio = process_wav(sound, windowSize, windowOffset, freq)   
     
+    println("[*] Escribiendo resultados en ", fileName)
+    #Escribimos en el archivo los datos procesados
+    f = open(fileName, "w")
+    for i in eachindex(parsedAudio)
+        print(f, round.(parsedAudio[i][1]; digits=3)," ")
+        print(f, round.(parsedAudio[i][1]; digits=3)," ")
+        
+        has_bee = (parsedAudio[i][3]==1.0)
+        println(f, has_bee)
+    end
+    println("[*] Procesado completado")
+end
 
 
-
+#Usage julia ./procesado.jl 'song.wav' 'data.lab'
+args = ARGS
+cancion = args[1]
+lab = args[2]
+process_sample(cancion, lab,"audio.txt",3, 1)
 
